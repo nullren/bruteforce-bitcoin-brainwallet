@@ -1,11 +1,10 @@
 # Crypto functions borrowed from Joric/bitcoin-dev
-import hashlib
+import codecs
 import ctypes
 import ctypes.util
-import urllib2
-import sys
-import codecs
-import itertools
+import hashlib
+
+import requests
 
 ssl = ctypes.cdll.LoadLibrary (ctypes.util.find_library ('ssl') or 'libeay32')
 
@@ -201,17 +200,15 @@ if __name__ == '__main__':
         address = a[0]
         private_address = a[1]
         try:
-          received_bitcoins = urllib2.urlopen("http://blockchain.info/address/{}".format(address)).read()
-          it = itertools.takewhile( lambda x: x!=' ',
-              received_bitcoins[received_bitcoins.find("final_balance") + 52:])
-          balance = float(''.join(it))
-          if balance > 0:
-            found.write("{}:{}\n".format(address, private_address))
-            print("Found {} with balance {}".format(address, balance))
-          else:
-            print("Just another {} balance".format(balance))
-        except urllib2.HTTPError:
-          pass
+            received_bitcoins = requests.get('http://blockchain.info/address/{}?format=json'.format(address))
+            balance = received_bitcoins.json()['final_balance']
+            if balance > 0:
+                found.write("{}:{}\n".format(address, private_address))
+                print("Found {} with balance {}".format(address, balance))
+            else:
+                print("Just another {} balance".format(balance))
+        except:
+            pass
         if( (line_count % 1000) == 0 ):
             print("Progress: {} of {} words checked so far".format(line_count, num_lines))
             
